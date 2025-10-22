@@ -55,6 +55,14 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// 🔢 Helper para paginado
+const getPagination = (req) => {
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(parseInt(req.query.limit) || 10, 100);
+  const skip = (page - 1) * limit;
+  return { skip, take: limit, page, limit };
+};
+
 // ---------- Auth ----------
 app.post("/api/auth/register", requireAuth, requireAdmin, async (req, res) => {
   const { email, password, role } = req.body || {};
@@ -148,13 +156,26 @@ app.post("/api/auth/reset-password", async (req, res) => {
 });
 
 // ---------- Usuarios ----------
-// ---------- Usuarios ----------
 app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "desc" },
-    select: { id: true, email: true, role: true, createdAt: true },
+  const { skip, take, page, limit } = getPagination(req);
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      skip,
+      take,
+      orderBy: { createdAt: "desc" },
+      select: { id: true, email: true, role: true, createdAt: true },
+    }),
+    prisma.user.count(),
+  ]);
+
+  res.json({
+    data: users,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
   });
-  res.json(users);
 });
 
 app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
@@ -162,7 +183,6 @@ app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
   if (!email?.trim()) return res.status(400).json({ error: "Email requerido" });
 
   try {
-    // 🚫 Evita duplicar email en otros usuarios
     const exists = await prisma.user.findFirst({
       where: { email: email.trim(), NOT: { id: req.params.id } },
     });
@@ -201,12 +221,28 @@ app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
 // ---------- Barbers ----------
 app.get("/api/barbers", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
-  const barbers = await prisma.barber.findMany({
-    where: q ? { name: { contains: q, mode: "insensitive" } } : undefined,
-    orderBy: { name: "asc" },
-    include: { _count: { select: { cuts: true } } },
+  const { skip, take, page, limit } = getPagination(req);
+
+  const [barbers, total] = await Promise.all([
+    prisma.barber.findMany({
+      where: q ? { name: { contains: q, mode: "insensitive" } } : undefined,
+      skip,
+      take,
+      orderBy: { name: "asc" },
+      include: { _count: { select: { cuts: true } } },
+    }),
+    prisma.barber.count({
+      where: q ? { name: { contains: q, mode: "insensitive" } } : undefined,
+    }),
+  ]);
+
+  res.json({
+    data: barbers,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
   });
-  res.json(barbers);
 });
 
 app.post("/api/barbers", requireAuth, async (req, res) => {
@@ -251,6 +287,8 @@ app.delete("/api/barbers/:id", requireAuth, async (req, res) => {
 // ---------- Clients ----------
 app.get("/api/clients", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
+  const { skip, take, page, limit } = getPagination(req);
+
   const where = q
     ? {
         OR: [
@@ -261,11 +299,23 @@ app.get("/api/clients", requireAuth, async (req, res) => {
       }
     : undefined;
 
-  const clients = await prisma.client.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
+  const [clients, total] = await Promise.all([
+    prisma.client.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.client.count({ where }),
+  ]);
+
+  res.json({
+    data: clients,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
   });
-  res.json(clients);
 });
 
 app.post("/api/clients", requireAuth, async (req, res) => {
@@ -358,23 +408,40 @@ app.post("/api/cuts", requireAuth, async (req, res) => {
 });
 
 app.get("/api/cuts", requireAuth, async (req, res) => {
+  const { skip, take, page, limit } = getPagination(req);
+
   const clientId = req.query.clientId
     ? String(req.query.clientId).trim()
     : null;
   const barberId = req.query.barberId
     ? String(req.query.barberId).trim()
     : null;
+
   const where = {
     ...(clientId ? { clientId } : {}),
     ...(barberId ? { barberId } : {}),
   };
 
-  const cuts = await prisma.cut.findMany({
-    where: Object.keys(where).length ? where : undefined,
-    orderBy: { date: "desc" },
-    include: { client: true, barber: true, photos: true },
+  const [cuts, total] = await Promise.all([
+    prisma.cut.findMany({
+      where: Object.keys(where).length ? where : undefined,
+      skip,
+      take,
+      orderBy: { date: "desc" },
+      include: { client: true, barber: true, photos: true },
+    }),
+    prisma.cut.count({
+      where: Object.keys(where).length ? where : undefined,
+    }),
+  ]);
+
+  res.json({
+    data: cuts,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
   });
-  res.json(cuts);
 });
 
 app.put("/api/cuts/:id", requireAuth, async (req, res) => {
@@ -439,10 +506,10 @@ app.delete("/api/cuts/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Root ----------
 app.get("/", (req, res) => {
   res.send("🚀 API activa y funcionando correctamente");
 });
 
 // ---------- Start ----------
 app.listen(PORT, () => console.log(`✅ API lista en http://localhost:${PORT}`));
-
