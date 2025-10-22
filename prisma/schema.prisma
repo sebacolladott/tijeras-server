@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  resetTokens  PasswordResetToken[]
+}
+
+model Barber {
+  id        String   @id @default(uuid())
+  name      String
+  bio       String?
+  cuts      Cut[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
+  notes     String?
+  cuts      Cut[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Cut {
+  id        String    @id @default(uuid())
+
+  clientId  String
+  client    Client    @relation(fields: [clientId], references: [id])
+
+  barberId  String
+  barber    Barber    @relation(fields: [barberId], references: [id])
+
+  date      DateTime  @default(now())
+  style     String?
+  notes     String?
+
+  photos    CutPhoto[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([clientId, date])
+  @@index([barberId])
+}
+
+model CutPhoto {
+  id        String   @id @default(uuid())
+  cutId     String
+  cut       Cut      @relation(fields: [cutId], references: [id], onDelete: Cascade)
+
+  mimeType  String
+  data      Bytes
+  position  Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([cutId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
