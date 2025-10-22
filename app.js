@@ -318,6 +318,22 @@ app.get("/api/clients", requireAuth, async (req, res) => {
   });
 });
 
+app.get("/api/clients/:id", requireAuth, async (req, res) => {
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id: req.params.id },
+      include: { cuts: { include: { barber: true, photos: true } } },
+    });
+
+    if (!client)
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    res.json(client);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error al obtener el cliente" });
+  }
+});
+
 app.post("/api/clients", requireAuth, async (req, res) => {
   const { name, phone, notes } = req.body || {};
   if (!name) return res.status(400).json({ error: "Nombre requerido" });
