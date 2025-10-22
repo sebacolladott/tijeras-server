@@ -444,6 +444,24 @@ app.get("/api/cuts", requireAuth, async (req, res) => {
   });
 });
 
+app.get("/api/cuts/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const cut = await prisma.cut.findUnique({
+      where: { id },
+      include: { client: true, barber: true, photos: true },
+    });
+
+    if (!cut) return res.status(404).json({ error: "Corte no encontrado" });
+
+    res.json(cut);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error al obtener el corte" });
+  }
+});
+
 app.put("/api/cuts/:id", requireAuth, async (req, res) => {
   try {
     const {
