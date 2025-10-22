@@ -245,6 +245,27 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
   });
 });
 
+app.get("/api/barbers/:id", requireAuth, async (req, res) => {
+  try {
+    const barber = await prisma.barber.findUnique({
+      where: { id: req.params.id },
+      include: {
+        cuts: {
+          include: { client: true, photos: true },
+          orderBy: { date: "desc" },
+        },
+      },
+    });
+
+    if (!barber)
+      return res.status(404).json({ error: "Barbero no encontrado" });
+    res.json(barber);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error al obtener el barbero" });
+  }
+});
+
 app.post("/api/barbers", requireAuth, async (req, res) => {
   const { name, bio } = req.body || {};
   if (!name) return res.status(400).json({ error: "Nombre requerido" });
