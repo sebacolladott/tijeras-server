@@ -447,6 +447,7 @@ app.post("/api/cuts", requireAuth, async (req, res) => {
 app.get("/api/cuts", requireAuth, async (req, res) => {
   const { skip, take, page, limit } = getPagination(req);
 
+  const q = (req.query.q || "").trim();
   const clientId = req.query.clientId
     ? String(req.query.clientId).trim()
     : null;
@@ -457,19 +458,27 @@ app.get("/api/cuts", requireAuth, async (req, res) => {
   const where = {
     ...(clientId ? { clientId } : {}),
     ...(barberId ? { barberId } : {}),
+    ...(q
+      ? {
+          OR: [
+            { style: { contains: q, mode: "insensitive" } },
+            { notes: { contains: q, mode: "insensitive" } },
+            { client: { name: { contains: q, mode: "insensitive" } } },
+            { barber: { name: { contains: q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
   };
 
   const [cuts, total] = await Promise.all([
     prisma.cut.findMany({
-      where: Object.keys(where).length ? where : undefined,
+      where,
       skip,
       take,
       orderBy: { date: "desc" },
       include: { client: true, barber: true, photos: true },
     }),
-    prisma.cut.count({
-      where: Object.keys(where).length ? where : undefined,
-    }),
+    prisma.cut.count({ where }),
   ]);
 
   res.json({
