@@ -465,10 +465,10 @@ app.get("/api/cuts", requireAuth, async (req, res) => {
     ...(q
       ? {
           OR: [
-            { style: { contains: q, mode: "insensitive" } },
-            { notes: { contains: q, mode: "insensitive" } },
-            { client: { name: { contains: q, mode: "insensitive" } } },
-            { barber: { name: { contains: q, mode: "insensitive" } } },
+            { style: { contains: q } },
+            { notes: { contains: q } },
+            { client: { name: { contains: q } } },
+            { barber: { name: { contains: q } } },
           ],
         }
       : {}),
