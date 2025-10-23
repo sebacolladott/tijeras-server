@@ -306,59 +306,37 @@ app.delete("/api/barbers/:id", requireAuth, async (req, res) => {
 });
 
 // ---------- Clients ----------
-app.get("/api/cuts", requireAuth, async (req, res) => {
+app.get("/api/clients", requireAuth, async (req, res) => {
+  const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
-  const q = (req.query.q || "").trim();
-  const clientId = req.query.clientId
-    ? String(req.query.clientId).trim()
-    : null;
-  const barberId = req.query.barberId
-    ? String(req.query.barberId).trim()
-    : null;
+  const where = q
+    ? {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          { phone: { contains: q, mode: "insensitive" } },
+          { notes: { contains: q, mode: "insensitive" } },
+        ],
+      }
+    : undefined;
 
-  // 🧭 Nuevo: campos para ordenar
-  const sortBy = req.query.sortBy || "date"; // ej: date | createdAt | style
-  const order = req.query.order === "asc" ? "asc" : "desc";
+  const [clients, total] = await Promise.all([
+    prisma.client.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.client.count({ where }),
+  ]);
 
-  const where = {
-    ...(clientId ? { clientId } : {}),
-    ...(barberId ? { barberId } : {}),
-    ...(q
-      ? {
-          OR: [
-            { style: { contains: q, mode: "insensitive" } },
-            { notes: { contains: q, mode: "insensitive" } },
-            { client: { name: { contains: q, mode: "insensitive" } } },
-            { barber: { name: { contains: q, mode: "insensitive" } } },
-          ],
-        }
-      : {}),
-  };
-
-  try {
-    const [cuts, total] = await Promise.all([
-      prisma.cut.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { [sortBy]: order }, // ← dinámico
-        include: { client: true, barber: true, photos: true },
-      }),
-      prisma.cut.count({ where }),
-    ]);
-
-    res.json({
-      data: cuts,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (err) {
-    console.error("Error al obtener cortes:", err);
-    res.status(500).json({ error: "Error al obtener cortes" });
-  }
+  res.json({
+    data: clients,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  });
 });
 
 app.get("/api/clients/:id", requireAuth, async (req, res) => {
@@ -477,6 +455,10 @@ app.get("/api/cuts", requireAuth, async (req, res) => {
     ? String(req.query.barberId).trim()
     : null;
 
+  // 🧭 Nuevo: campos para ordenar
+  const sortBy = req.query.sortBy || "date"; // ej: date | createdAt | style
+  const order = req.query.order === "asc" ? "asc" : "desc";
+
   const where = {
     ...(clientId ? { clientId } : {}),
     ...(barberId ? { barberId } : {}),
@@ -492,24 +474,29 @@ app.get("/api/cuts", requireAuth, async (req, res) => {
       : {}),
   };
 
-  const [cuts, total] = await Promise.all([
-    prisma.cut.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { date: "desc" },
-      include: { client: true, barber: true, photos: true },
-    }),
-    prisma.cut.count({ where }),
-  ]);
+  try {
+    const [cuts, total] = await Promise.all([
+      prisma.cut.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { [sortBy]: order }, // ← dinámico
+        include: { client: true, barber: true, photos: true },
+      }),
+      prisma.cut.count({ where }),
+    ]);
 
-  res.json({
-    data: cuts,
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-  });
+    res.json({
+      data: cuts,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error("Error al obtener cortes:", err);
+    res.status(500).json({ error: "Error al obtener cortes" });
+  }
 });
 
 app.get("/api/cuts/:id", requireAuth, async (req, res) => {
