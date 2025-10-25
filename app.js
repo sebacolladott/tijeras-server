@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import nodemailer from "nodemailer";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -127,6 +128,30 @@ app.post("/api/auth/change-password", requireAuth, async (req, res) => {
 });
 
 // ---------- Recuperación de contraseña ----------
+const transporter = nodemailer.createTransport({
+  service: "hotmail",
+  auth: {
+    user: "sebastiancolladott@outlook.com",
+    pass: "Sansung1+", // si usás 2FA → contraseña de aplicación
+  },
+});
+
+async function sendResetEmail(to, token) {
+  const resetLink = `https://tu-frontend.com/reset-password?token=${token}`;
+
+  await transporter.sendMail({
+    from: "Tijeras <tu_correo@outlook.com>",
+    to,
+    subject: "Recuperación de contraseña",
+    html: `
+      <h2>Recuperar contraseña</h2>
+      <p>Haz clic en el siguiente enlace para restablecer tu contraseña:</p>
+      <p><a href="${resetLink}">${resetLink}</a></p>
+      <p>Si no solicitaste esto, puedes ignorar este mensaje.</p>
+    `,
+  });
+}
+
 const resetTokens = new Map();
 
 app.post("/api/auth/request-reset", async (req, res) => {
@@ -139,7 +164,14 @@ app.post("/api/auth/request-reset", async (req, res) => {
   const token = crypto.randomBytes(20).toString("hex");
   resetTokens.set(token, user.id);
 
-  console.log("🔗 Token de recuperación:", token);
+  // ⬇️ ENVÍA EL MAIL
+  try {
+    await sendResetEmail(email, token);
+  } catch (err) {
+    console.log("Error enviando mail:", err);
+    return res.status(500).json({ error: "No se pudo enviar el correo" });
+  }
+
   res.json({ ok: true });
 });
 
