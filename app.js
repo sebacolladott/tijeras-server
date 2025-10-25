@@ -126,7 +126,6 @@ app.post("/api/auth/change-password", requireAuth, async (req, res) => {
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
   res.json({ ok: true });
 });
-
 // ---------- Recuperación de contraseña ----------
 const transporter = nodemailer.createTransport({
   host: "smtp.office365.com",
@@ -134,10 +133,7 @@ const transporter = nodemailer.createTransport({
   secure: false,
   auth: {
     user: "sebastiancolladott@outlook.com",
-    pass: "xhvycclyxgfrfyhl",
-  },
-  tls: {
-    ciphers: "SSLv3",
+    pass: "bddzcwhpvhbncmns",
   },
 });
 
