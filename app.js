@@ -136,6 +136,9 @@ const transporter = nodemailer.createTransport({
     user: "sebastiancolladott@outlook.com",
     pass: "xhvycclyxgfrfyhl",
   },
+  tls: {
+    ciphers: "SSLv3",
+  },
 });
 
 async function sendResetEmail(to, token) {
