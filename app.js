@@ -136,7 +136,7 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendResetEmail(to, token) {
-  const resetLink = `https://tijeras.imeatara.com/reset-password?token=${token}`;
+  const resetLink = `https://tijeras.imeatara.com/reset?token=${token}`;
 
   await transporter.sendMail({
     from: "Tijeras <tu_correo@outlook.com>",
