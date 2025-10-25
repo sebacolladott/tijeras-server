@@ -132,22 +132,34 @@ const transporter = nodemailer.createTransport({
   service: "hotmail",
   auth: {
     user: "sebastiancolladott@outlook.com",
-    pass: "Sansung1+", // si usás 2FA → contraseña de aplicación
+    pass: "xhvycclyxgfrfyhl",
   },
 });
 
 async function sendResetEmail(to, token) {
-  const resetLink = `https://tu-frontend.com/reset-password?token=${token}`;
+  const resetLink = `https://tijeras.imeatara.com/reset-password?token=${token}`;
 
   await transporter.sendMail({
     from: "Tijeras <tu_correo@outlook.com>",
     to,
     subject: "Recuperación de contraseña",
     html: `
-      <h2>Recuperar contraseña</h2>
-      <p>Haz clic en el siguiente enlace para restablecer tu contraseña:</p>
-      <p><a href="${resetLink}">${resetLink}</a></p>
-      <p>Si no solicitaste esto, puedes ignorar este mensaje.</p>
+      <div style="font-family: sans-serif; max-width: 400px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+        <h2 style="text-align:center; margin-bottom: 20px;">Restablecer contraseña</h2>
+        
+        <p>Haz clic en el botón para crear una nueva contraseña:</p>
+
+        <a href="${resetLink}" 
+           style="display:inline-block; background:#000; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none; margin:16px 0; text-align:center;">
+           Restablecer contraseña
+        </a>
+
+        <p>Si no solicitaste esto, simplemente ignora este mensaje.</p>
+
+        <small style="opacity:0.6;">Si el botón no funciona, copia y pega este enlace:</small>
+        <br />
+        <a href="${resetLink}" style="opacity:0.8; font-size: 13px;">${resetLink}</a>
+      </div>
     `,
   });
 }
