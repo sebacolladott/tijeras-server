@@ -128,12 +128,12 @@ app.post("/api/auth/change-password", requireAuth, async (req, res) => {
 });
 // ---------- Recuperación de contraseña ----------
 const transporter = nodemailer.createTransport({
-  host: "smtp.office365.com",
+  host: "gmail",
   port: 587,
   secure: false,
   auth: {
-    user: "sebastiancolladott@outlook.com",
-    pass: "bddzcwhpvhbncmns",
+    user: "sebastiancolladott@gmail.com",
+    pass: "xlduralhusiuvorn",
   },
 });
 
