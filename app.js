@@ -129,12 +129,15 @@ app.post("/api/auth/change-password", requireAuth, async (req, res) => {
 
 // ---------- Recuperación de contraseña ----------
 const transporter = nodemailer.createTransport({
-  service: "smtp.office365.com",
+  host: "smtp.office365.com",
   port: 587,
   secure: false,
   auth: {
     user: "sebastiancolladott@outlook.com",
     pass: "xhvycclyxgfrfyhl",
+  },
+  tls: {
+    ciphers: "SSLv3",
   },
 });
 
