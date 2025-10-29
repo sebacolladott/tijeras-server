@@ -21,7 +21,7 @@ const COOKIE = process.env.COOKIE_NAME || "token";
 app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
 );
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json());
 app.use(cookieParser());
 app.disable("x-powered-by");
 
@@ -444,10 +444,10 @@ const normalizeBase64 = (s) =>
 const toPhotoCreates = (arr = []) =>
   arr
     .map((p, i) => {
-      const data = normalizeBase64(p.base64 || p.data);
-      return data
+      const base64 = normalizeBase64(p.base64 || p.data);
+      return base64
         ? {
-            data: Buffer.from(data, "base64"),
+            data: Buffer.from(base64, "base64"), // 👈 convierte a binario
             mimeType: p.mimeType || "image/webp",
             position: p.position ?? i,
           }
@@ -466,6 +466,7 @@ app.post("/api/cuts", requireAuth, async (req, res) => {
       notes,
       photos = [],
     } = req.body || {};
+
     if (!clientId || !barberId)
       return res.status(400).json({ error: "IDs requeridos" });
 
@@ -476,10 +477,11 @@ app.post("/api/cuts", requireAuth, async (req, res) => {
         date: date ? new Date(date) : undefined,
         client: { connect: { id: String(clientId).trim() } },
         barber: { connect: { id: String(barberId).trim() } },
-        photos: { create: toPhotoCreates(photos) },
+        photos: { create: toPhotoCreates(photos) }, // 👈 binario ya convertido
       },
       include: { client: true, barber: true, photos: true },
     });
+
     res.status(201).json(cut);
   } catch (e) {
     console.error(e);
