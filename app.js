@@ -1,12 +1,23 @@
 import "dotenv/config";
+
+// ---------- Core ----------
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+
+// ---------- Database ----------
 import { PrismaClient } from "@prisma/client";
+
+// ---------- Auth / Seguridad ----------
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+
+// ---------- Email ----------
 import nodemailer from "nodemailer";
+
+// ---------- Archivos ----------
+import multer from "multer";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -438,56 +449,44 @@ app.delete("/api/clients/:id", requireAuth, async (req, res) => {
 });
 
 // ---------- Cuts ----------
-const normalizeBase64 = (s) =>
-  s?.includes(",") ? s.split(",").pop() : s || "";
+const upload = multer({ storage: multer.memoryStorage() });
 
-const toPhotoCreates = (arr = []) =>
-  arr
-    .map((p, i) => {
-      const base64 = normalizeBase64(p.base64 || p.data);
-      return base64
-        ? {
-            data: Buffer.from(base64, "base64"), // 👈 convierte a binario
-            mimeType: p.mimeType || "image/webp",
-            position: p.position ?? i,
-          }
-        : null;
-    })
-    .filter(Boolean)
-    .slice(0, 10);
+app.post(
+  "/api/cuts",
+  requireAuth,
+  upload.array("photos", 10),
+  async (req, res) => {
+    try {
+      const { clientId, barberId, date, style, notes } = req.body;
+      if (!clientId || !barberId)
+        return res.status(400).json({ error: "IDs requeridos" });
 
-app.post("/api/cuts", requireAuth, async (req, res) => {
-  try {
-    const {
-      clientId,
-      barberId,
-      date,
-      style,
-      notes,
-      photos = [],
-    } = req.body || {};
+      // multer deja los archivos en req.files
+      const photos = (req.files || []).map((file, i) => ({
+        data: Buffer.from(file.buffer), // 👈 binario listo
+        mimeType: file.mimetype || "image/webp",
+        position: i,
+      }));
 
-    if (!clientId || !barberId)
-      return res.status(400).json({ error: "IDs requeridos" });
+      const cut = await prisma.cut.create({
+        data: {
+          style,
+          notes,
+          date: date ? new Date(date) : undefined,
+          client: { connect: { id: String(clientId).trim() } },
+          barber: { connect: { id: String(barberId).trim() } },
+          photos: { create: photos },
+        },
+        include: { client: true, barber: true, photos: true },
+      });
 
-    const cut = await prisma.cut.create({
-      data: {
-        style,
-        notes,
-        date: date ? new Date(date) : undefined,
-        client: { connect: { id: String(clientId).trim() } },
-        barber: { connect: { id: String(barberId).trim() } },
-        photos: { create: toPhotoCreates(photos) }, // 👈 binario ya convertido
-      },
-      include: { client: true, barber: true, photos: true },
-    });
-
-    res.status(201).json(cut);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Error creando corte" });
+      res.status(201).json(cut);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Error creando corte" });
+    }
   }
-});
+);
 
 app.get("/api/cuts", requireAuth, async (req, res) => {
   const { skip, take, page, limit } = getPagination(req);
