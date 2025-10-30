@@ -277,26 +277,34 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
-  const [barbers, total] = await Promise.all([
-    prisma.barber.findMany({
-      where: q ? { name: { contains: q, mode: "insensitive" } } : undefined,
-      skip,
-      take,
-      orderBy: { name: "asc" },
-      include: { _count: { select: { cuts: true } } },
-    }),
-    prisma.barber.count({
-      where: q ? { name: { contains: q, mode: "insensitive" } } : undefined,
-    }),
-  ]);
+  const sortBy = req.query.sortBy || "name";
+  const order = req.query.order === "desc" ? "desc" : "asc";
 
-  res.json({
-    data: barbers,
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-  });
+  const where = q ? { name: { contains: q, mode: "insensitive" } } : undefined;
+
+  try {
+    const [barbers, total] = await Promise.all([
+      prisma.barber.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { [sortBy]: order },
+        include: { _count: { select: { cuts: true } } },
+      }),
+      prisma.barber.count({ where }),
+    ]);
+
+    res.json({
+      data: barbers,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (e) {
+    console.error("Error al obtener barberos:", e);
+    res.status(500).json({ error: "Error al obtener barberos" });
+  }
 });
 
 app.get("/api/barbers/:id", requireAuth, async (req, res) => {
@@ -364,6 +372,9 @@ app.get("/api/clients", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
+  const sortBy = req.query.sortBy || "createdAt";
+  const order = req.query.order === "asc" ? "asc" : "desc";
+
   const where = q
     ? {
         OR: [
@@ -374,23 +385,28 @@ app.get("/api/clients", requireAuth, async (req, res) => {
       }
     : undefined;
 
-  const [clients, total] = await Promise.all([
-    prisma.client.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.client.count({ where }),
-  ]);
+  try {
+    const [clients, total] = await Promise.all([
+      prisma.client.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { [sortBy]: order },
+      }),
+      prisma.client.count({ where }),
+    ]);
 
-  res.json({
-    data: clients,
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-  });
+    res.json({
+      data: clients,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (e) {
+    console.error("Error al obtener clientes:", e);
+    res.status(500).json({ error: "Error al obtener clientes" });
+  }
 });
 
 app.get("/api/clients/:id", requireAuth, async (req, res) => {
