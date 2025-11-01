@@ -277,10 +277,13 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
-  const sortBy = req.query.sortBy || "name";
+  const validSortFields = ["name", "bio", "createdAt", "updatedAt"];
+  const sortBy = validSortFields.includes(req.query.sortBy)
+    ? req.query.sortBy
+    : "name";
   const order = req.query.order === "desc" ? "desc" : "asc";
 
-  const where = q ? { name: { contains: q, mode: "insensitive" } } : undefined;
+  const where = q ? { name: { contains: q, mode: "insensitive" } } : {}; // 👈 no undefined
 
   try {
     const [barbers, total] = await Promise.all([
@@ -372,7 +375,10 @@ app.get("/api/clients", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
-  const sortBy = req.query.sortBy || "createdAt";
+  const validSortFields = ["name", "phone", "notes", "createdAt", "updatedAt"];
+  const sortBy = validSortFields.includes(req.query.sortBy)
+    ? req.query.sortBy
+    : "createdAt";
   const order = req.query.order === "asc" ? "asc" : "desc";
 
   const where = q
@@ -383,7 +389,7 @@ app.get("/api/clients", requireAuth, async (req, res) => {
           { notes: { contains: q, mode: "insensitive" } },
         ],
       }
-    : undefined;
+    : {}; // 👈 no undefined
 
   try {
     const [clients, total] = await Promise.all([
