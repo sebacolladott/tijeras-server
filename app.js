@@ -283,7 +283,7 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
     : "name";
   const order = req.query.order === "desc" ? "desc" : "asc";
 
-  const where = q ? { name: { contains: q, mode: "insensitive" } } : {}; // 👈 no undefined
+  const where = q ? { name: { contains: q } } : {}; // 👈 no undefined
 
   try {
     const [barbers, total] = await Promise.all([
@@ -384,9 +384,9 @@ app.get("/api/clients", requireAuth, async (req, res) => {
   const where = q
     ? {
         OR: [
-          { name: { contains: q, mode: "insensitive" } },
-          { phone: { contains: q, mode: "insensitive" } },
-          { notes: { contains: q, mode: "insensitive" } },
+          { name: { contains: q } },
+          { phone: { contains: q } },
+          { notes: { contains: q } },
         ],
       }
     : {}; // 👈 no undefined
