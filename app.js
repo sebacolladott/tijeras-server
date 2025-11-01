@@ -309,7 +309,9 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
                     { notes: { contains: q, mode: "insensitive" } },
                     {
                       client: {
-                        is: { name: { contains: q, mode: "insensitive" } },
+                        is: {
+                          name: { contains: q, mode: "insensitive" },
+                        },
                       },
                     },
                   ],
