@@ -272,6 +272,161 @@ app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// ---------- Estadísticas ----------
+app.get("/api/stats", requireAuth, async (req, res) => {
+  try {
+    const [
+      totalCuts,
+      totalClients,
+      totalBarbers,
+      totalPhotos,
+      latestCuts,
+      cutsByBarber,
+      cutsByClient,
+      cutsByMonth,
+      topStyles,
+      activeClients,
+      activeBarbers,
+      recentUsers,
+    ] = await Promise.all([
+      prisma.cut.count(),
+      prisma.client.count(),
+      prisma.barber.count(),
+      prisma.cutPhoto.count(),
+
+      // 🕓 Últimos 5 cortes
+      prisma.cut.findMany({
+        orderBy: { date: "desc" },
+        take: 5,
+        include: {
+          client: { select: { name: true } },
+          barber: { select: { name: true } },
+        },
+      }),
+
+      // 💈 Total de cortes por barbero
+      prisma.barber.findMany({
+        select: { id: true, name: true, _count: { select: { cuts: true } } },
+        orderBy: { name: "asc" },
+      }),
+
+      // 👥 Clientes con más cortes
+      prisma.client.findMany({
+        select: { id: true, name: true, _count: { select: { cuts: true } } },
+        orderBy: { cuts: { _count: "desc" } },
+        take: 5,
+      }),
+
+      // 🗓️ Cortes agrupados por mes
+      prisma.cut.findMany({
+        where: { date: { not: null } },
+        select: { date: true },
+      }),
+
+      // ✂️ Estilos más comunes
+      prisma.cut.groupBy({
+        by: ["style"],
+        _count: { _all: true },
+        orderBy: { _count: { _all: "desc" } },
+        take: 5,
+      }),
+
+      // 👥 Clientes más activos (últimos 30 días)
+      prisma.cut.groupBy({
+        by: ["clientId"],
+        _count: { _all: true },
+        where: {
+          date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+
+      // 💈 Barberos más activos (últimos 30 días)
+      prisma.cut.groupBy({
+        by: ["barberId"],
+        _count: { _all: true },
+        where: {
+          date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+
+      // 👤 Usuarios recientes
+      prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, email: true, role: true, createdAt: true },
+      }),
+    ]);
+
+    // 🗓️ Agrupar cortes por mes
+    const monthly = {};
+    for (const c of cutsByMonth) {
+      if (!c.date) continue;
+      const key = c.date.toISOString().slice(0, 7); // "YYYY-MM"
+      monthly[key] = (monthly[key] || 0) + 1;
+    }
+
+    // 🔍 Mapear IDs de barberos y clientes activos
+    const activeClientsData = await Promise.all(
+      activeClients.map(async (c) => {
+        const client = await prisma.client.findUnique({
+          where: { id: c.clientId },
+          select: { name: true },
+        });
+        return { client: client?.name || "Desconocido", total: c._count._all };
+      })
+    );
+
+    const activeBarbersData = await Promise.all(
+      activeBarbers.map(async (b) => {
+        const barber = await prisma.barber.findUnique({
+          where: { id: b.barberId },
+          select: { name: true },
+        });
+        return { barber: barber?.name || "Desconocido", total: b._count._all };
+      })
+    );
+
+    // ✅ Respuesta final
+    res.json({
+      totals: {
+        cuts: totalCuts,
+        clients: totalClients,
+        barbers: totalBarbers,
+        photos: totalPhotos,
+      },
+      latestCuts,
+      ranking: {
+        byBarber: cutsByBarber.map((b) => ({
+          barber: b.name,
+          totalCuts: b._count.cuts,
+        })),
+        byClient: cutsByClient.map((c) => ({
+          client: c.name,
+          totalCuts: c._count.cuts,
+        })),
+        topStyles: topStyles.map((s) => ({
+          style: s.style || "Sin estilo",
+          total: s._count._all,
+        })),
+      },
+      activity: {
+        monthlyCuts: Object.entries(monthly).map(([month, total]) => ({
+          month,
+          total,
+        })),
+        activeClients: activeClientsData,
+        activeBarbers: activeBarbersData,
+      },
+      recent: {
+        users: recentUsers,
+      },
+    });
+  } catch (e) {
+    console.error("Error en /api/stats:", e);
+    res.status(500).json({ error: "Error al obtener estadísticas" });
+  }
+});
+
 // ---------- Barbers ----------
 app.get("/api/barbers", requireAuth, async (req, res) => {
   const { skip, take, page, limit } = getPagination(req);
