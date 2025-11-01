@@ -275,7 +275,6 @@ app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
 // ---------- Estadísticas ----------
 app.get("/api/stats", requireAuth, async (req, res) => {
   try {
-    // ⏳ Carga simultánea pero con defensas por si algo falla
     const [
       totalCuts,
       totalClients,
@@ -295,7 +294,6 @@ app.get("/api/stats", requireAuth, async (req, res) => {
       prisma.barber.count().catch(() => 0),
       prisma.cutPhoto.count().catch(() => 0),
 
-      // 🕓 Últimos 5 cortes
       prisma.cut
         .findMany({
           orderBy: { date: "desc" },
@@ -307,7 +305,6 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         })
         .catch(() => []),
 
-      // 💈 Total de cortes por barbero
       prisma.barber
         .findMany({
           select: { id: true, name: true, _count: { select: { cuts: true } } },
@@ -315,7 +312,6 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         })
         .catch(() => []),
 
-      // 👥 Clientes con más cortes
       prisma.client
         .findMany({
           select: { id: true, name: true, _count: { select: { cuts: true } } },
@@ -324,7 +320,6 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         })
         .catch(() => []),
 
-      // 🗓️ Cortes agrupados por mes (filtrado manual por nulls)
       prisma.cut
         .findMany({
           select: { date: true },
@@ -332,7 +327,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         .then((rows) => rows.filter((r) => !!r.date))
         .catch(() => []),
 
-      // ✂️ Estilos más comunes
+      // ✅ Estilos más comunes (manual, compatible con SQLite)
       prisma.cut
         .findMany({
           select: { style: true },
@@ -354,33 +349,26 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         })
         .catch(() => []),
 
-      // 👥 Clientes más activos (últimos 30 días)
       prisma.cut
         .groupBy({
           by: ["clientId"],
           _count: { _all: true },
           where: {
-            date: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            },
+            date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
           },
         })
         .catch(() => []),
 
-      // 💈 Barberos más activos (últimos 30 días)
       prisma.cut
         .groupBy({
           by: ["barberId"],
           _count: { _all: true },
           where: {
-            date: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            },
+            date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
           },
         })
         .catch(() => []),
 
-      // 👤 Usuarios recientes
       prisma.user
         .findMany({
           orderBy: { createdAt: "desc" },
@@ -390,17 +378,15 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         .catch(() => []),
     ]);
 
-    /* -------------------- 📊 Procesamiento de datos -------------------- */
-
-    // 🗓️ Agrupar cortes por mes
+    // 📊 Agrupar cortes por mes
     const monthly = {};
     for (const c of cutsRawDates) {
       if (!c.date) continue;
-      const key = new Date(c.date).toISOString().slice(0, 7); // "YYYY-MM"
+      const key = new Date(c.date).toISOString().slice(0, 7);
       monthly[key] = (monthly[key] || 0) + 1;
     }
 
-    // 🔍 Mapear clientes/barberos activos
+    // 🔍 Mapear activos
     const activeClientsData = await Promise.all(
       activeClients.map(async (c) => {
         const client = await prisma.client
@@ -431,7 +417,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
       })
     );
 
-    /* -------------------- ✅ Respuesta final -------------------- */
+    // ✅ Respuesta final
     res.json({
       totals: {
         cuts: totalCuts,
@@ -451,7 +437,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         })),
         topStyles: topStyles.map((s) => ({
           style: s.style || "Sin estilo",
-          total: s._count._all,
+          total: s.total || 0,
         })),
       },
       activity: {
@@ -462,9 +448,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         activeClients: activeClientsData,
         activeBarbers: activeBarbersData,
       },
-      recent: {
-        users: recentUsers,
-      },
+      recent: { users: recentUsers },
     });
   } catch (e) {
     console.error("Error en /api/stats:", e);
