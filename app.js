@@ -309,9 +309,7 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
                     { notes: { contains: q, mode: "insensitive" } },
                     {
                       client: {
-                        is: {
-                          name: { contains: q, mode: "insensitive" },
-                        },
+                        is: { name: { contains: q, mode: "insensitive" } },
                       },
                     },
                   ],
@@ -447,9 +445,7 @@ app.get("/api/clients", requireAuth, async (req, res) => {
                     { notes: { contains: q, mode: "insensitive" } },
                     {
                       barber: {
-                        is: {
-                          name: { contains: q, mode: "insensitive" },
-                        },
+                        is: { name: { contains: q, mode: "insensitive" } },
                       },
                     },
                   ],
@@ -628,8 +624,8 @@ app.get("/api/cuts", requireAuth, async (req, res) => {
           OR: [
             { style: { contains: q, mode: "insensitive" } },
             { notes: { contains: q, mode: "insensitive" } },
-            { client: { name: { contains: q, mode: "insensitive" } } },
-            { barber: { name: { contains: q, mode: "insensitive" } } },
+            { client: { is: { name: { contains: q, mode: "insensitive" } } } },
+            { barber: { is: { name: { contains: q, mode: "insensitive" } } } },
           ],
         }
       : {}),
