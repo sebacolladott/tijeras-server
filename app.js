@@ -274,16 +274,25 @@ app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
 
 // ---------- Barbers ----------
 app.get("/api/barbers", requireAuth, async (req, res) => {
-  const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
-  const validSortFields = ["name", "bio", "createdAt", "updatedAt"];
-  const sortBy = validSortFields.includes(req.query.sortBy)
+  const q = (req.query.q || "").trim();
+
+  // 🧭 Campos válidos para ordenar
+  const sortBy = ["name", "bio", "createdAt", "updatedAt"].includes(
+    req.query.sortBy
+  )
     ? req.query.sortBy
     : "name";
+
   const order = req.query.order === "desc" ? "desc" : "asc";
 
-  const where = q ? { name: { contains: q } } : {}; // 👈 no undefined
+  // 🎯 Filtros dinámicos
+  const where = q
+    ? {
+        OR: [{ name: { contains: q } }, { bio: { contains: q } }],
+      }
+    : {};
 
   try {
     const [barbers, total] = await Promise.all([
@@ -292,7 +301,9 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
         skip,
         take,
         orderBy: { [sortBy]: order },
-        include: { _count: { select: { cuts: true } } },
+        include: {
+          _count: { select: { cuts: true } }, // 💈 total de cortes por barbero
+        },
       }),
       prisma.barber.count({ where }),
     ]);
@@ -304,8 +315,8 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
       total,
       totalPages: Math.ceil(total / limit),
     });
-  } catch (e) {
-    console.error("Error al obtener barberos:", e);
+  } catch (err) {
+    console.error("Error al obtener barberos:", err);
     res.status(500).json({ error: "Error al obtener barberos" });
   }
 });
@@ -372,24 +383,35 @@ app.delete("/api/barbers/:id", requireAuth, async (req, res) => {
 
 // ---------- Clients ----------
 app.get("/api/clients", requireAuth, async (req, res) => {
-  const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
-  const validSortFields = ["name", "phone", "notes", "createdAt", "updatedAt"];
-  const sortBy = validSortFields.includes(req.query.sortBy)
+  const q = (req.query.q || "").trim();
+  const barberId = req.query.barberId
+    ? String(req.query.barberId).trim()
+    : null;
+
+  // 🧭 Campos válidos para ordenar
+  const sortBy = ["name", "phone", "notes", "createdAt", "updatedAt"].includes(
+    req.query.sortBy
+  )
     ? req.query.sortBy
     : "createdAt";
+
   const order = req.query.order === "asc" ? "asc" : "desc";
 
-  const where = q
-    ? {
-        OR: [
-          { name: { contains: q } },
-          { phone: { contains: q } },
-          { notes: { contains: q } },
-        ],
-      }
-    : {}; // 👈 no undefined
+  // 🎯 Filtros dinámicos
+  const where = {
+    ...(barberId ? { cuts: { some: { barberId } } } : {}),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q } },
+            { phone: { contains: q } },
+            { notes: { contains: q } },
+          ],
+        }
+      : {}),
+  };
 
   try {
     const [clients, total] = await Promise.all([
@@ -398,6 +420,7 @@ app.get("/api/clients", requireAuth, async (req, res) => {
         skip,
         take,
         orderBy: { [sortBy]: order },
+        include: { cuts: true }, // 🧩 opcional, coherente con /cuts
       }),
       prisma.client.count({ where }),
     ]);
@@ -409,8 +432,8 @@ app.get("/api/clients", requireAuth, async (req, res) => {
       total,
       totalPages: Math.ceil(total / limit),
     });
-  } catch (e) {
-    console.error("Error al obtener clientes:", e);
+  } catch (err) {
+    console.error("Error al obtener clientes:", err);
     res.status(500).json({ error: "Error al obtener clientes" });
   }
 });
