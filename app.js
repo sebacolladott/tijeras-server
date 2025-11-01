@@ -319,7 +319,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
 
       // 🗓️ Cortes agrupados por mes
       prisma.cut.findMany({
-        where: { date: { not: null } },
+        where: { NOT: { date: null } }, // ✅ correcto
         select: { date: true },
       }),
 
