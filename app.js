@@ -277,10 +277,35 @@ app.get("/api/barbers", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
-  const sortBy = req.query.sortBy || "name";
-  const order = req.query.order === "desc" ? "desc" : "asc";
+  const clientId = req.query.clientId ? String(req.query.clientId).trim() : null;
+  const barberId = req.query.barberId ? String(req.query.barberId).trim() : null;
 
-  const where = q ? { name: { contains: q, mode: "insensitive" } } : undefined;
+  const sortBy = req.query.sortBy || "createdAt";
+  const order = req.query.order === "asc" ? "asc" : "desc";
+
+  const where = {
+    ...(barberId ? { id: barberId } : {}),
+    ...(clientId ? { cuts: { some: { clientId } } } : {}),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { bio: { contains: q, mode: "insensitive" } },
+            {
+              cuts: {
+                some: {
+                  OR: [
+                    { style: { contains: q, mode: "insensitive" } },
+                    { notes: { contains: q, mode: "insensitive" } },
+                    { client: { name: { contains: q, mode: "insensitive" } } },
+                  ],
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
 
   try {
     const [barbers, total] = await Promise.all([
@@ -372,18 +397,36 @@ app.get("/api/clients", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
   const { skip, take, page, limit } = getPagination(req);
 
+  const clientId = req.query.clientId ? String(req.query.clientId).trim() : null;
+  const barberId = req.query.barberId ? String(req.query.barberId).trim() : null;
+
   const sortBy = req.query.sortBy || "createdAt";
   const order = req.query.order === "asc" ? "asc" : "desc";
 
-  const where = q
-    ? {
-        OR: [
-          { name: { contains: q, mode: "insensitive" } },
-          { phone: { contains: q, mode: "insensitive" } },
-          { notes: { contains: q, mode: "insensitive" } },
-        ],
-      }
-    : undefined;
+  const where = {
+    ...(clientId ? { id: clientId } : {}),
+    ...(barberId ? { cuts: { some: { barberId } } } : {}),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { phone: { contains: q, mode: "insensitive" } },
+            { notes: { contains: q, mode: "insensitive" } },
+            {
+              cuts: {
+                some: {
+                  OR: [
+                    { style: { contains: q, mode: "insensitive" } },
+                    { notes: { contains: q, mode: "insensitive" } },
+                    { barber: { name: { contains: q, mode: "insensitive" } } },
+                  ],
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
 
   try {
     const [clients, total] = await Promise.all([
