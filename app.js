@@ -334,11 +334,23 @@ app.get("/api/stats", requireAuth, async (req, res) => {
 
       // ✂️ Estilos más comunes
       prisma.cut
-        .groupBy({
-          by: ["style"],
-          _count: { _all: true },
-          orderBy: { _count: { _all: "desc" } },
-          take: 5,
+        .findMany({
+          select: { style: true },
+        })
+        .then((rows) => {
+          const counter = {};
+          for (const r of rows) {
+            if (!r.style) continue;
+            const key = r.style.trim().toLowerCase();
+            counter[key] = (counter[key] || 0) + 1;
+          }
+          return Object.entries(counter)
+            .map(([style, total]) => ({
+              style: style.charAt(0).toUpperCase() + style.slice(1),
+              total,
+            }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5);
         })
         .catch(() => []),
 
