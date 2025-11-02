@@ -695,6 +695,7 @@ fs.mkdirSync(cutsDir, { recursive: true });
 // 🧩 Configuración de almacenamiento físico con multer
 const storage = multer.diskStorage({
   destination: cutsDir,
+  limits: { fileSize: 50 * 1024 * 1024 },
   filename: (_, file, cb) => {
     const unique = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
     cb(null, unique);
