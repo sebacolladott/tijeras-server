@@ -45,11 +45,11 @@ CREATE TABLE "Cut" (
 CREATE TABLE "CutPhoto" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "cutId" TEXT NOT NULL,
-    "mimeType" TEXT NOT NULL,
-    "data" BLOB NOT NULL,
-    "position" INTEGER NOT NULL DEFAULT 0,
+    "path" TEXT,
+    "mimeType" TEXT,
+    "position" INTEGER,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "CutPhoto_cutId_fkey" FOREIGN KEY ("cutId") REFERENCES "Cut" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "CutPhoto_cutId_fkey" FOREIGN KEY ("cutId") REFERENCES "Cut" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -70,9 +70,6 @@ CREATE INDEX "Cut_clientId_date_idx" ON "Cut"("clientId", "date");
 
 -- CreateIndex
 CREATE INDEX "Cut_barberId_idx" ON "Cut"("barberId");
-
--- CreateIndex
-CREATE INDEX "CutPhoto_cutId_idx" ON "CutPhoto"("cutId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("token");
