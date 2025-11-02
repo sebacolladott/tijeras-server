@@ -32,9 +32,15 @@ const COOKIE = process.env.COOKIE_NAME || "token";
 app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
 );
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
 app.disable("x-powered-by");
+
+// ---------- Static uploads ----------
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+app.use("/uploads", express.static(uploadDir));
 
 // ---------- Helpers ----------
 const signToken = (payload) =>
@@ -678,8 +684,6 @@ app.delete("/api/clients/:id", requireAuth, async (req, res) => {
 });
 
 // ---------- Cuts ----------
-const upload = multer({ storage: multer.memoryStorage() });
-
 app.post(
   "/api/cuts",
   requireAuth,
@@ -690,9 +694,8 @@ app.post(
       if (!clientId || !barberId)
         return res.status(400).json({ error: "IDs requeridos" });
 
-      // multer deja los archivos en req.files
       const photos = (req.files || []).map((file, i) => ({
-        data: Buffer.from(file.buffer), // 👈 binario listo
+        path: `/uploads/${file.filename}`,
         mimeType: file.mimetype || "image/webp",
         position: i,
       }));
@@ -711,166 +714,74 @@ app.post(
 
       res.status(201).json(cut);
     } catch (e) {
-      console.error(e);
+      console.error("Error creando corte:", e);
       res.status(500).json({ error: "Error creando corte" });
     }
   }
 );
 
+// ---------- Obtener cortes ----------
 app.get("/api/cuts", requireAuth, async (req, res) => {
-  const { skip, take, page, limit } = getPagination(req);
-
-  const q = (req.query.q || "").trim();
-  const clientId = req.query.clientId
-    ? String(req.query.clientId).trim()
-    : null;
-  const barberId = req.query.barberId
-    ? String(req.query.barberId).trim()
-    : null;
-
-  // 🧭 Nuevo: campos para ordenar
-  const sortBy = req.query.sortBy || "date"; // ej: date | createdAt | style
-  const order = req.query.order === "asc" ? "asc" : "desc";
-
-  const where = {
-    ...(clientId ? { clientId } : {}),
-    ...(barberId ? { barberId } : {}),
-    ...(q
-      ? {
-          OR: [
-            { style: { contains: q } },
-            { notes: { contains: q } },
-            { client: { name: { contains: q } } },
-            { barber: { name: { contains: q } } },
-          ],
-        }
-      : {}),
-  };
-
   try {
-    const [cuts, total] = await Promise.all([
-      prisma.cut.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { [sortBy]: order }, // ← dinámico
-        include: { client: true, barber: true, photos: true },
-      }),
-      prisma.cut.count({ where }),
-    ]);
-
-    res.json({
-      data: cuts,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
+    const cuts = await prisma.cut.findMany({
+      include: { client: true, barber: true, photos: true },
+      orderBy: { date: "desc" },
     });
-  } catch (err) {
-    console.error("Error al obtener cortes:", err);
+    res.json(cuts);
+  } catch (e) {
+    console.error("Error al obtener cortes:", e);
     res.status(500).json({ error: "Error al obtener cortes" });
   }
 });
 
-app.get("/api/cuts/:id", requireAuth, async (req, res) => {
+// ---------- Eliminar corte + fotos físicas ----------
+app.delete("/api/cuts/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const photos = await prisma.cutPhoto.findMany({ where: { cutId: id } });
 
-    const cut = await prisma.cut.findUnique({
-      where: { id },
-      include: { client: true, barber: true, photos: true },
-    });
-
-    if (!cut) return res.status(404).json({ error: "Corte no encontrado" });
-
-    res.json(cut);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Error al obtener el corte" });
-  }
-});
-
-app.put(
-  "/api/cuts/:id",
-  requireAuth,
-  upload.array("photos", 10),
-  async (req, res) => {
-    try {
-      const id = req.params.id;
-      const { clientId, barberId, style, notes, keep = [] } = req.body;
-
-      const existing = await prisma.cut.findUnique({
-        where: { id },
-        include: { photos: true },
-      });
-
-      if (!existing) return res.status(404).json({ error: "No encontrado" });
-
-      // 1️⃣ Actualiza datos básicos
-      await prisma.cut.update({
-        where: { id },
-        data: { clientId, barberId, style, notes },
-      });
-
-      // 2️⃣ Elimina fotos que no se mantienen
-      const toDelete = existing.photos.filter((p) => !keep.includes(p.id));
-      if (toDelete.length) {
-        await prisma.cutPhoto.deleteMany({
-          where: { id: { in: toDelete.map((p) => p.id) } },
+    for (const photo of photos) {
+      if (photo.path) {
+        const filePath = path.join(
+          process.cwd(),
+          photo.path.replace("/uploads", "uploads")
+        );
+        fs.unlink(filePath, (err) => {
+          if (err) console.error("Error borrando archivo:", err);
         });
       }
-
-      // 3️⃣ Agrega las nuevas (req.files de multer)
-      const photos = (req.files || []).map((file, i) => ({
-        cutId: id,
-        mimeType: file.mimetype || "image/webp",
-        data: Buffer.from(file.buffer),
-        position: existing.photos.length + i,
-      }));
-
-      if (photos.length) {
-        await prisma.cutPhoto.createMany({ data: photos });
-      }
-
-      res.json({ ok: true });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Error al actualizar" });
     }
-  }
-);
 
-app.get("/api/cuts/:id/photos/:photoId/data", requireAuth, async (req, res) => {
-  try {
-    const photo = await prisma.cutPhoto.findUnique({
-      where: { id: req.params.photoId },
-    });
+    await prisma.cutPhoto.deleteMany({ where: { cutId: id } });
+    await prisma.cut.delete({ where: { id } });
 
-    if (!photo) return res.sendStatus(404);
-
-    res.setHeader("Content-Type", photo.mimeType || "image/webp");
-    res.end(photo.data); // 👈 no usar Buffer.from()
+    res.json({ ok: true });
   } catch (e) {
-    console.error("Error al servir la foto:", e);
-    res.status(500).json({ error: "Error al cargar la foto" });
+    console.error("Error al eliminar corte:", e);
+    res.status(500).json({ error: "Error al eliminar corte" });
   }
 });
 
-app.delete("/api/cuts/:id", requireAuth, async (req, res) => {
-  await prisma.cut.delete({ where: { id: req.params.id } }).catch(() => {});
-  res.json({ ok: true });
-});
-
+// ---------- Eliminar foto individual ----------
 app.delete("/api/cuts/:id/photos/:photoId", requireAuth, async (req, res) => {
   try {
     const { id, photoId } = req.params;
-
     const photo = await prisma.cutPhoto.findUnique({ where: { id: photoId } });
     if (!photo) return res.status(404).json({ error: "Foto no encontrada" });
     if (photo.cutId !== id)
       return res.status(400).json({ error: "Foto no pertenece al corte" });
 
     await prisma.cutPhoto.delete({ where: { id: photoId } });
+
+    if (photo.path) {
+      const filePath = path.join(
+        process.cwd(),
+        photo.path.replace("/uploads", "uploads")
+      );
+      fs.unlink(filePath, (err) => {
+        if (err) console.error("Error borrando archivo:", err);
+      });
+    }
 
     res.json({ ok: true });
   } catch (e) {
