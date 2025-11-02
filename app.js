@@ -43,8 +43,7 @@ if (!fs.existsSync(uploadDir)) {
 app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
 );
-app.use(express.json({ limit: "200mb" }));
-app.use(express.urlencoded({ limit: "200mb", extended: true }));
+app.use(express.json());
 app.use(cookieParser());
 app.disable("x-powered-by");
 
@@ -695,7 +694,6 @@ fs.mkdirSync(cutsDir, { recursive: true });
 // 🧩 Configuración de almacenamiento físico con multer
 const storage = multer.diskStorage({
   destination: cutsDir,
-  limits: { fileSize: 50 * 1024 * 1024 },
   filename: (_, file, cb) => {
     const unique = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
     cb(null, unique);
