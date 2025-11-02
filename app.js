@@ -702,6 +702,55 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// 📋 Listar cortes con búsqueda, orden y paginación
+app.get("/api/cuts", requireAuth, async (req, res) => {
+  try {
+    const { skip, take, page, limit } = getPagination(req);
+    const q = (req.query.q || "").trim();
+    const sortBy = ["createdAt", "date", "style"].includes(req.query.sortBy)
+      ? req.query.sortBy
+      : "createdAt";
+    const order = req.query.order === "asc" ? "asc" : "desc";
+
+    const where = q
+      ? {
+          OR: [
+            { style: { contains: q } },
+            { notes: { contains: q } },
+            { client: { name: { contains: q } } },
+            { barber: { name: { contains: q } } },
+          ],
+        }
+      : {};
+
+    const [cuts, total] = await Promise.all([
+      prisma.cut.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { [sortBy]: order },
+        include: {
+          client: { select: { id: true, name: true } },
+          barber: { select: { id: true, name: true } },
+          photos: true,
+        },
+      }),
+      prisma.cut.count({ where }),
+    ]);
+
+    res.json({
+      data: cuts,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (e) {
+    console.error("Error obteniendo cortes:", e);
+    res.status(500).json({ error: "Error al obtener cortes" });
+  }
+});
+
 // 📍 Crear corte con fotos
 app.post(
   "/api/cuts",
