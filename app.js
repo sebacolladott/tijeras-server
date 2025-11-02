@@ -43,8 +43,7 @@ if (!fs.existsSync(uploadDir)) {
 app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
 );
-app.use(express.json({ limit: "200mb" }));
-app.use(express.urlencoded({ limit: "200mb", extended: true }));
+app.use(express.json());
 app.use(cookieParser());
 app.disable("x-powered-by");
 app.use((req, res, next) => {
@@ -705,20 +704,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 25 * 1024 * 1024, // 🔹 Máx 25 MB por foto
-    files: 10, // 🔹 Máx 10 fotos por corte
-    fieldSize: 100 * 1024 * 1024, // 🔹 Máx 100 MB en total (form completo)
-  },
-  fileFilter: (_, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Solo se permiten imágenes"), false);
-    }
-    cb(null, true);
-  },
-});
+const upload = multer({ storage });
 
 // 📋 Listar cortes con búsqueda, orden y paginación
 app.get("/api/cuts", requireAuth, async (req, res) => {
