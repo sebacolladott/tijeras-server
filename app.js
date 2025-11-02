@@ -1,23 +1,15 @@
 import "dotenv/config";
-
-// ---------- Core ----------
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-
-// ---------- Database ----------
-import { PrismaClient } from "@prisma/client";
-
-// ---------- Auth / Seguridad ----------
+import path from "path"; // ✅ <-- faltaba esto
+import fs from "fs";
+import multer from "multer";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-
-// ---------- Email ----------
 import nodemailer from "nodemailer";
-
-// ---------- Archivos ----------
-import multer from "multer";
+import { PrismaClient } from "@prisma/client";
 
 const app = express();
 const prisma = new PrismaClient();
