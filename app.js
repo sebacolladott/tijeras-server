@@ -1,15 +1,25 @@
 import "dotenv/config";
+
+// ---------- Core ----------
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import path from "path"; // ✅ <-- faltaba esto
-import fs from "fs";
-import multer from "multer";
+
+// ---------- Database ----------
+import { PrismaClient } from "@prisma/client";
+
+// ---------- Auth / Seguridad ----------
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+
+// ---------- Email ----------
 import nodemailer from "nodemailer";
-import { PrismaClient } from "@prisma/client";
+
+// ---------- Archivos ----------
+import fs from "fs";
+import path from "path";
+import multer from "multer";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -20,34 +30,22 @@ const ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 const COOKIE = process.env.COOKIE_NAME || "token";
 
+// ---------- Static uploads ----------
+const uploadDir = path.join(process.cwd(), "uploads");
+
+// 🧩 crea la carpeta si no existe
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("📁 Carpeta 'uploads' creada automáticamente");
+}
+
 // ---------- Middlewares ----------
 app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
 );
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json());
 app.use(cookieParser());
 app.disable("x-powered-by");
-
-// ---------- Static uploads ----------
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-app.use("/uploads", express.static(uploadDir));
-
-// ---------- Multer configuración ----------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `${unique}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // máximo 25 MB por archivo
-});
 
 // ---------- Helpers ----------
 const signToken = (payload) =>
@@ -691,6 +689,7 @@ app.delete("/api/clients/:id", requireAuth, async (req, res) => {
 });
 
 // ---------- Cuts ----------
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.post(
   "/api/cuts",
@@ -698,105 +697,189 @@ app.post(
   upload.array("photos", 10),
   async (req, res) => {
     try {
-      const { clientId, barberId, date, style, notes } = req.body;
+      const { clientId, barberId, style, notes } = req.body;
       if (!clientId || !barberId)
         return res.status(400).json({ error: "IDs requeridos" });
 
       const photos = (req.files || []).map((file, i) => ({
-        path: `/uploads/${file.filename}`,
+        data: Buffer.from(file.buffer),
         mimeType: file.mimetype || "image/webp",
         position: i,
       }));
 
-      const cutData = {
-        style: style ?? null,
-        notes: notes ?? null,
-        date: new Date(),
-        client: { connect: { id: String(clientId).trim() } },
-        barber: { connect: { id: String(barberId).trim() } },
-        photos: photos.length ? { create: photos } : undefined,
-      };
-
-      // eliminar undefined (Prisma los odia)
-      Object.keys(cutData).forEach(
-        (k) => cutData[k] === undefined && delete cutData[k]
-      );
-
       const cut = await prisma.cut.create({
-        data: cutData,
+        data: {
+          style,
+          notes,
+          client: { connect: { id: String(clientId).trim() } },
+          barber: { connect: { id: String(barberId).trim() } },
+          photos: { create: photos },
+        },
         include: { client: true, barber: true, photos: true },
       });
 
       res.status(201).json(cut);
     } catch (e) {
-      console.error("Error creando corte:", e);
+      console.error(e);
       res.status(500).json({ error: "Error creando corte" });
     }
   }
 );
 
-// ---------- Obtener cortes ----------
 app.get("/api/cuts", requireAuth, async (req, res) => {
+  const { skip, take, page, limit } = getPagination(req);
+
+  const q = (req.query.q || "").trim();
+  const clientId = req.query.clientId
+    ? String(req.query.clientId).trim()
+    : null;
+  const barberId = req.query.barberId
+    ? String(req.query.barberId).trim()
+    : null;
+
+  // 🧭 Nuevo: campos para ordenar
+  const sortBy = req.query.sortBy || "createdAt"; // ej: date | createdAt | style
+  const order = req.query.order === "asc" ? "asc" : "desc";
+
+  const where = {
+    ...(clientId ? { clientId } : {}),
+    ...(barberId ? { barberId } : {}),
+    ...(q
+      ? {
+          OR: [
+            { style: { contains: q } },
+            { notes: { contains: q } },
+            { client: { name: { contains: q } } },
+            { barber: { name: { contains: q } } },
+          ],
+        }
+      : {}),
+  };
+
   try {
-    const cuts = await prisma.cut.findMany({
-      include: { client: true, barber: true, photos: true },
-      orderBy: { date: "desc" },
+    const [cuts, total] = await Promise.all([
+      prisma.cut.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { [sortBy]: order }, // ← dinámico
+        include: { client: true, barber: true, photos: true },
+      }),
+      prisma.cut.count({ where }),
+    ]);
+
+    res.json({
+      data: cuts,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
     });
-    res.json(cuts);
-  } catch (e) {
-    console.error("Error al obtener cortes:", e);
+  } catch (err) {
+    console.error("Error al obtener cortes:", err);
     res.status(500).json({ error: "Error al obtener cortes" });
   }
 });
 
-// ---------- Eliminar corte + fotos físicas ----------
-app.delete("/api/cuts/:id", requireAuth, async (req, res) => {
+app.get("/api/cuts/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const photos = await prisma.cutPhoto.findMany({ where: { cutId: id } });
 
-    for (const photo of photos) {
-      if (photo.path) {
-        const filePath = path.join(
-          process.cwd(),
-          photo.path.replace("/uploads", "uploads")
-        );
-        fs.unlink(filePath, (err) => {
-          if (err) console.error("Error borrando archivo:", err);
-        });
-      }
-    }
+    const cut = await prisma.cut.findUnique({
+      where: { id },
+      include: { client: true, barber: true, photos: true },
+    });
 
-    await prisma.cutPhoto.deleteMany({ where: { cutId: id } });
-    await prisma.cut.delete({ where: { id } });
+    if (!cut) return res.status(404).json({ error: "Corte no encontrado" });
 
-    res.json({ ok: true });
+    res.json(cut);
   } catch (e) {
-    console.error("Error al eliminar corte:", e);
-    res.status(500).json({ error: "Error al eliminar corte" });
+    console.error(e);
+    res.status(500).json({ error: "Error al obtener el corte" });
   }
 });
 
-// ---------- Eliminar foto individual ----------
+app.put(
+  "/api/cuts/:id",
+  requireAuth,
+  upload.array("photos", 10),
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { clientId, barberId, style, notes, keep = [] } = req.body;
+
+      const existing = await prisma.cut.findUnique({
+        where: { id },
+        include: { photos: true },
+      });
+
+      if (!existing) return res.status(404).json({ error: "No encontrado" });
+
+      // 1️⃣ Actualiza datos básicos
+      await prisma.cut.update({
+        where: { id },
+        data: { clientId, barberId, style, notes },
+      });
+
+      // 2️⃣ Elimina fotos que no se mantienen
+      const toDelete = existing.photos.filter((p) => !keep.includes(p.id));
+      if (toDelete.length) {
+        await prisma.cutPhoto.deleteMany({
+          where: { id: { in: toDelete.map((p) => p.id) } },
+        });
+      }
+
+      // 3️⃣ Agrega las nuevas (req.files de multer)
+      const photos = (req.files || []).map((file, i) => ({
+        cutId: id,
+        mimeType: file.mimetype || "image/webp",
+        data: Buffer.from(file.buffer),
+        position: existing.photos.length + i,
+      }));
+
+      if (photos.length) {
+        await prisma.cutPhoto.createMany({ data: photos });
+      }
+
+      res.json({ ok: true });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Error al actualizar" });
+    }
+  }
+);
+
+app.get("/api/cuts/:id/photos/:photoId/data", requireAuth, async (req, res) => {
+  try {
+    const photo = await prisma.cutPhoto.findUnique({
+      where: { id: req.params.photoId },
+    });
+
+    if (!photo) return res.sendStatus(404);
+
+    res.setHeader("Content-Type", photo.mimeType || "image/webp");
+    res.end(photo.data); // 👈 no usar Buffer.from()
+  } catch (e) {
+    console.error("Error al servir la foto:", e);
+    res.status(500).json({ error: "Error al cargar la foto" });
+  }
+});
+
+app.delete("/api/cuts/:id", requireAuth, async (req, res) => {
+  await prisma.cut.delete({ where: { id: req.params.id } }).catch(() => {});
+  res.json({ ok: true });
+});
+
 app.delete("/api/cuts/:id/photos/:photoId", requireAuth, async (req, res) => {
   try {
     const { id, photoId } = req.params;
+
     const photo = await prisma.cutPhoto.findUnique({ where: { id: photoId } });
     if (!photo) return res.status(404).json({ error: "Foto no encontrada" });
     if (photo.cutId !== id)
       return res.status(400).json({ error: "Foto no pertenece al corte" });
 
     await prisma.cutPhoto.delete({ where: { id: photoId } });
-
-    if (photo.path) {
-      const filePath = path.join(
-        process.cwd(),
-        photo.path.replace("/uploads", "uploads")
-      );
-      fs.unlink(filePath, (err) => {
-        if (err) console.error("Error borrando archivo:", err);
-      });
-    }
 
     res.json({ ok: true });
   } catch (e) {
@@ -809,6 +892,9 @@ app.delete("/api/cuts/:id/photos/:photoId", requireAuth, async (req, res) => {
 app.get("/", (req, res) => {
   res.send("🚀 API activa y funcionando correctamente");
 });
+
+// 📦 servir archivos estáticos
+app.use("/uploads", express.static(uploadDir));
 
 // ---------- Start ----------
 app.listen(PORT, () => console.log(`✅ API lista en http://localhost:${PORT}`));

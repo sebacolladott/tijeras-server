@@ -43,35 +43,37 @@ model Client {
 }
 
 model Cut {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
 
   clientId  String
-  client    Client    @relation(fields: [clientId], references: [id])
+  client    Client   @relation(fields: [clientId], references: [id])
 
   barberId  String
-  barber    Barber    @relation(fields: [barberId], references: [id])
+  barber    Barber   @relation(fields: [barberId], references: [id])
 
-  date      DateTime  @default(now())
   style     String?
   notes     String?
 
   photos    CutPhoto[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([clientId, date])
+  @@index([clientId])
   @@index([barberId])
 }
+
 
 model CutPhoto {
   id        String   @id @default(cuid())
   cutId     String
   cut       Cut      @relation(fields: [cutId], references: [id])
-  path      String?
+  path      String   
   mimeType  String?
   position  Int?
   createdAt DateTime @default(now())
+
+  @@index([cutId])
 }
 
 

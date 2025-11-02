@@ -32,7 +32,6 @@ CREATE TABLE "Cut" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "clientId" TEXT NOT NULL,
     "barberId" TEXT NOT NULL,
-    "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "style" TEXT,
     "notes" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -45,7 +44,7 @@ CREATE TABLE "Cut" (
 CREATE TABLE "CutPhoto" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "cutId" TEXT NOT NULL,
-    "path" TEXT,
+    "path" TEXT NOT NULL,
     "mimeType" TEXT,
     "position" INTEGER,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -66,10 +65,13 @@ CREATE TABLE "PasswordResetToken" (
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE INDEX "Cut_clientId_date_idx" ON "Cut"("clientId", "date");
+CREATE INDEX "Cut_clientId_idx" ON "Cut"("clientId");
 
 -- CreateIndex
 CREATE INDEX "Cut_barberId_idx" ON "Cut"("barberId");
+
+-- CreateIndex
+CREATE INDEX "CutPhoto_cutId_idx" ON "CutPhoto"("cutId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("token");
