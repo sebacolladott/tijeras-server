@@ -751,6 +751,26 @@ app.get("/api/cuts", requireAuth, async (req, res) => {
   }
 });
 
+// 📍 Obtener detalle de un corte
+app.get("/api/cuts/:id", requireAuth, async (req, res) => {
+  try {
+    const cut = await prisma.cut.findUnique({
+      where: { id: req.params.id },
+      include: {
+        client: { select: { id: true, name: true, phone: true } },
+        barber: { select: { id: true, name: true, bio: true } },
+        photos: true,
+      },
+    });
+
+    if (!cut) return res.status(404).json({ error: "Corte no encontrado" });
+    res.json(cut);
+  } catch (e) {
+    console.error("Error obteniendo corte:", e);
+    res.status(500).json({ error: "Error al obtener corte" });
+  }
+});
+
 // 📍 Crear corte con fotos
 app.post(
   "/api/cuts",
