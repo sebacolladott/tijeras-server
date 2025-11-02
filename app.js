@@ -708,15 +708,22 @@ app.post(
         position: i,
       }));
 
+      const cutData = {
+        style: style ?? null,
+        notes: notes ?? null,
+        date: new Date(),
+        client: { connect: { id: String(clientId).trim() } },
+        barber: { connect: { id: String(barberId).trim() } },
+        photos: photos.length ? { create: photos } : undefined,
+      };
+
+      // eliminar undefined (Prisma los odia)
+      Object.keys(cutData).forEach(
+        (k) => cutData[k] === undefined && delete cutData[k]
+      );
+
       const cut = await prisma.cut.create({
-        data: {
-          style,
-          notes,
-          date: new Date(),
-          client: { connect: { id: String(clientId).trim() } },
-          barber: { connect: { id: String(barberId).trim() } },
-          photos: { create: photos },
-        },
+        data: cutData,
         include: { client: true, barber: true, photos: true },
       });
 
