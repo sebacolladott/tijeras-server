@@ -307,7 +307,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
 
       prisma.cut
         .findMany({
-          orderBy: { date: "desc" },
+          orderBy: { createdAt: "desc" },
           take: 5,
           include: {
             client: { select: { name: true } },
@@ -333,12 +333,11 @@ app.get("/api/stats", requireAuth, async (req, res) => {
 
       prisma.cut
         .findMany({
-          select: { date: true },
+          select: { createdAt: true },
         })
-        .then((rows) => rows.filter((r) => !!r.date))
+        .then((rows) => rows.filter((r) => !!r.createdAt))
         .catch(() => []),
 
-      // ✅ Estilos más comunes (manual, compatible con SQLite)
       prisma.cut
         .findMany({
           select: { style: true },
@@ -365,7 +364,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
           by: ["clientId"],
           _count: { _all: true },
           where: {
-            date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
           },
         })
         .catch(() => []),
@@ -375,7 +374,7 @@ app.get("/api/stats", requireAuth, async (req, res) => {
           by: ["barberId"],
           _count: { _all: true },
           where: {
-            date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
           },
         })
         .catch(() => []),
@@ -389,15 +388,14 @@ app.get("/api/stats", requireAuth, async (req, res) => {
         .catch(() => []),
     ]);
 
-    // 📊 Agrupar cortes por mes
+    // 📊 Agrupar cortes por mes (usando createdAt)
     const monthly = {};
     for (const c of cutsRawDates) {
-      if (!c.date) continue;
-      const key = new Date(c.date).toISOString().slice(0, 7);
+      if (!c.createdAt) continue;
+      const key = new Date(c.createdAt).toISOString().slice(0, 7);
       monthly[key] = (monthly[key] || 0) + 1;
     }
 
-    // 🔍 Mapear activos
     const activeClientsData = await Promise.all(
       activeClients.map(async (c) => {
         const client = await prisma.client
@@ -428,7 +426,6 @@ app.get("/api/stats", requireAuth, async (req, res) => {
       })
     );
 
-    // ✅ Respuesta final
     res.json({
       totals: {
         cuts: totalCuts,
@@ -523,7 +520,7 @@ app.get("/api/barbers/:id", requireAuth, async (req, res) => {
       include: {
         cuts: {
           include: { client: true, photos: true },
-          orderBy: { date: "desc" },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
