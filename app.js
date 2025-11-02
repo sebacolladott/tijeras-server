@@ -40,8 +40,23 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // ---------- Middlewares ----------
+const allowedOrigins = [
+  "https://tijeras.imeatara.com",
+  "http://localhost:5173",
+];
+
 app.use(
-  cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
+  cors({
+    origin: function (origin, callback) {
+      // permitir requests sin "Origin" (como en curl o Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error("No permitido por CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
 );
 app.use(express.json());
 app.use(cookieParser());
