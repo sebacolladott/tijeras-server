@@ -34,6 +34,21 @@ const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 app.use("/uploads", express.static(uploadDir));
 
+// ---------- Multer configuración ----------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, `${unique}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // máximo 25 MB por archivo
+});
+
 // ---------- Helpers ----------
 const signToken = (payload) =>
   jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
@@ -676,6 +691,7 @@ app.delete("/api/clients/:id", requireAuth, async (req, res) => {
 });
 
 // ---------- Cuts ----------
+
 app.post(
   "/api/cuts",
   requireAuth,
