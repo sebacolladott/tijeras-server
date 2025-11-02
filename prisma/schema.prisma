@@ -65,18 +65,15 @@ model Cut {
 }
 
 model CutPhoto {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   cutId     String
-  cut       Cut      @relation(fields: [cutId], references: [id], onDelete: Cascade)
-
-  mimeType  String
-  data      Bytes
-  position  Int      @default(0)
-
+  cut       Cut      @relation(fields: [cutId], references: [id])
+  path      String?
+  mimeType  String?
+  position  Int?
   createdAt DateTime @default(now())
-
-  @@index([cutId])
 }
+
 
 model PasswordResetToken {
   id        String   @id @default(uuid())
