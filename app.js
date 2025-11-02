@@ -712,6 +712,7 @@ app.post(
         data: {
           style,
           notes,
+          date: new Date(),
           client: { connect: { id: String(clientId).trim() } },
           barber: { connect: { id: String(barberId).trim() } },
           photos: { create: photos },
