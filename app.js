@@ -765,7 +765,11 @@ app.put(
       const toDelete = existing.photos.filter((p) => !keep.includes(p.id));
       if (toDelete.length) {
         for (const photo of toDelete) {
-          const filePath = path.join(process.cwd(), photo.path);
+          const filePath = path.join(
+            process.cwd(),
+            photo.path.replace(/^\//, "")
+          );
+
           if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         }
         await prisma.cutPhoto.deleteMany({
@@ -858,16 +862,10 @@ app.get("/api/cuts/:id/photos/:photoId/data", requireAuth, async (req, res) => {
   }
 });
 
-// 📦 servir archivos estáticos globalmente
-app.use("/uploads", express.static(uploadDir));
-
 // ---------- Root ----------
 app.get("/", (req, res) => {
   res.send("🚀 API activa y funcionando correctamente");
 });
-
-// 📦 servir archivos estáticos
-app.use("/uploads", express.static(uploadDir));
 
 // ---------- Start ----------
 app.listen(PORT, () => console.log(`✅ API lista en http://localhost:${PORT}`));
