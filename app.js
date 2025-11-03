@@ -44,6 +44,7 @@ app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
 );
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.disable("x-powered-by");
 app.use((req, res, next) => {
@@ -704,7 +705,23 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+// Filtro para aceptar solo imágenes
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Solo se permiten imágenes"), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB por archivo
+    files: 3,
+  },
+});
 
 // 📋 Listar cortes con búsqueda, orden y paginación
 app.get("/api/cuts", requireAuth, async (req, res) => {
