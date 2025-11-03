@@ -39,6 +39,13 @@ if (!fs.existsSync(uploadDir)) {
   console.log("📁 Carpeta 'uploads' creada automáticamente");
 }
 
+// ✅ Servir archivos solo a usuarios autenticados
+app.use(
+  "/uploads",
+  requireAuth, // 🔒 exige JWT válido (cookie)
+  express.static(uploadDir)
+);
+
 // ---------- Middlewares ----------
 app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
