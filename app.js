@@ -39,13 +39,6 @@ if (!fs.existsSync(uploadDir)) {
   console.log("📁 Carpeta 'uploads' creada automáticamente");
 }
 
-// ✅ Servir archivos solo a usuarios autenticados
-app.use(
-  "/uploads",
-  requireAuth, // 🔒 exige JWT válido (cookie)
-  express.static(uploadDir)
-);
-
 // ---------- Middlewares ----------
 app.use(
   cors({ origin: ORIGIN.split(",").map((o) => o.trim()), credentials: true })
@@ -97,6 +90,13 @@ const getPagination = (req) => {
   const skip = (page - 1) * limit;
   return { skip, take: limit, page, limit };
 };
+
+// ✅ Servir archivos solo a usuarios autenticados
+app.use(
+  "/uploads",
+  requireAuth, // 🔒 exige JWT válido (cookie)
+  express.static(uploadDir)
+);
 
 // ---------- Auth ----------
 app.post("/api/auth/register", requireAuth, requireAdmin, async (req, res) => {
