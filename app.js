@@ -832,7 +832,7 @@ app.post(
 app.put(
   "/api/cuts/:id",
   requireAuth,
-  upload.array("photos", 10),
+  upload.array("photos", 3),
   async (req, res) => {
     try {
       const id = req.params.id;
